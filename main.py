@@ -455,18 +455,49 @@ class DataPreprocessingPipeline:
         plt.style.use('seaborn-v0_8')
         fig, axes = plt.subplots(2, 2, figsize=(15, 12))
         
-        # 1. Распределение длины заголовков
-        df['title_length'] = df['title'].str.len()
-        axes[0, 0].hist(df['title_length'], bins=20, alpha=0.7, color='skyblue')
-        axes[0, 0].set_title('Распределение длины заголовков')
-        axes[0, 0].set_xlabel('Длина заголовка')
-        axes[0, 0].set_ylabel('Частота')
+        # 1. Распределение длины заголовков (если есть колонка title)
+        if 'title' in df.columns:
+            df['title_length'] = df['title'].str.len()
+            axes[0, 0].hist(df['title_length'], bins=20, alpha=0.7, color='skyblue')
+            axes[0, 0].set_title('Распределение длины заголовков')
+            axes[0, 0].set_xlabel('Длина заголовка')
+            axes[0, 0].set_ylabel('Частота')
+        else:
+            # Альтернативная визуализация для данных о погоде
+            if 'temperature' in df.columns:
+                axes[0, 0].hist(df['temperature'], bins=20, alpha=0.7, color='skyblue')
+                axes[0, 0].set_title('Распределение температуры')
+                axes[0, 0].set_xlabel('Температура (°C)')
+                axes[0, 0].set_ylabel('Частота')
+            else:
+                axes[0, 0].text(0.5, 0.5, 'Нет данных для визуализации', 
+                               ha='center', va='center', transform=axes[0, 0].transAxes)
+                axes[0, 0].set_title('Распределение данных')
         
-        # 2. Распределение количества слов в тексте
-        axes[0, 1].hist(df['word_count'], bins=20, alpha=0.7, color='lightgreen')
-        axes[0, 1].set_title('Распределение количества слов в тексте')
-        axes[0, 1].set_xlabel('Количество слов')
-        axes[0, 1].set_ylabel('Частота')
+        # 2. Распределение количества слов в тексте или других числовых данных
+        if 'word_count' in df.columns:
+            axes[0, 1].hist(df['word_count'], bins=20, alpha=0.7, color='lightgreen')
+            axes[0, 1].set_title('Распределение количества слов в тексте')
+            axes[0, 1].set_xlabel('Количество слов')
+            axes[0, 1].set_ylabel('Частота')
+        elif 'humidity' in df.columns:
+            axes[0, 1].hist(df['humidity'], bins=20, alpha=0.7, color='lightgreen')
+            axes[0, 1].set_title('Распределение влажности')
+            axes[0, 1].set_xlabel('Влажность (%)')
+            axes[0, 1].set_ylabel('Частота')
+        else:
+            # Находим первую числовую колонку для визуализации
+            numeric_cols = df.select_dtypes(include=[np.number]).columns
+            if len(numeric_cols) > 0:
+                col = numeric_cols[0]
+                axes[0, 1].hist(df[col], bins=20, alpha=0.7, color='lightgreen')
+                axes[0, 1].set_title(f'Распределение {col}')
+                axes[0, 1].set_xlabel(col)
+                axes[0, 1].set_ylabel('Частота')
+            else:
+                axes[0, 1].text(0.5, 0.5, 'Нет числовых данных', 
+                               ha='center', va='center', transform=axes[0, 1].transAxes)
+                axes[0, 1].set_title('Распределение данных')
         
         # 3. Корреляция между признаками
         numeric_cols = df.select_dtypes(include=[np.number]).columns
@@ -501,11 +532,15 @@ class DataPreprocessingPipeline:
         
         df_processed = df.copy()
         
-        # Создаем числовые признаки из текстовых данных
-        df_processed['title_length'] = df_processed['title'].str.len()
-        df_processed['text_length'] = df_processed['text'].str.len()
-        df_processed['word_count'] = df_processed['text'].str.split().str.len()
-        df_processed['sentence_count'] = df_processed['text'].str.count(r'[.!?]+')
+        # Создаем числовые признаки из текстовых данных (если есть)
+        if 'title' in df_processed.columns:
+            df_processed['title_length'] = df_processed['title'].str.len()
+        
+        if 'text' in df_processed.columns:
+            df_processed['text_length'] = df_processed['text'].str.len()
+            df_processed['word_count'] = df_processed['text'].str.split().str.len()
+            df_processed['sentence_count'] = df_processed['text'].str.count(r'[.!?]+')
+            df_processed['has_text'] = (df_processed['text'].str.len() > 0).astype(int)
         
         # Создаем признаки на основе даты
         if 'date' in df_processed.columns:
@@ -514,9 +549,9 @@ class DataPreprocessingPipeline:
             df_processed['month'] = df_processed['date'].dt.month
             df_processed['year'] = df_processed['date'].dt.year
         
-        # Создаем бинарные признаки
-        df_processed['has_url'] = df_processed['url'].notna().astype(int)
-        df_processed['has_text'] = (df_processed['text'].str.len() > 0).astype(int)
+        # Создаем бинарные признаки (если есть соответствующие колонки)
+        if 'url' in df_processed.columns:
+            df_processed['has_url'] = df_processed['url'].notna().astype(int)
         
         return df_processed
     
@@ -526,16 +561,25 @@ class DataPreprocessingPipeline:
         
         df_processed = df.copy()
         
-        # Заполняем пропуски в текстовых полях
-        df_processed['title'] = df_processed['title'].fillna('Unknown Title')
-        df_processed['text'] = df_processed['text'].fillna('No text available')
-        df_processed['url'] = df_processed['url'].fillna('No URL')
+        # Заполняем пропуски в текстовых полях (если они есть)
+        if 'title' in df_processed.columns:
+            df_processed['title'] = df_processed['title'].fillna('Unknown Title')
+        
+        if 'text' in df_processed.columns:
+            df_processed['text'] = df_processed['text'].fillna('No text available')
+        
+        if 'url' in df_processed.columns:
+            df_processed['url'] = df_processed['url'].fillna('No URL')
+        
+        if 'city' in df_processed.columns:
+            df_processed['city'] = df_processed['city'].fillna('Unknown City')
         
         # Заполняем пропуски в числовых полях
         numeric_columns = df_processed.select_dtypes(include=[np.number]).columns
-        df_processed[numeric_columns] = df_processed[numeric_columns].fillna(
-            df_processed[numeric_columns].mean()
-        )
+        if len(numeric_columns) > 0:
+            df_processed[numeric_columns] = df_processed[numeric_columns].fillna(
+                df_processed[numeric_columns].mean()
+            )
         
         return df_processed
     
@@ -567,26 +611,41 @@ class DataPreprocessingPipeline:
         
         df_processed = df.copy()
         
-        # TF-IDF признаки из заголовков (упрощенная версия)
-        from collections import Counter
+        # TF-IDF признаки из заголовков (если есть колонка title)
+        if 'title' in df_processed.columns:
+            from collections import Counter
+            
+            # Собираем все слова из заголовков
+            all_words = []
+            for title in df_processed['title']:
+                if pd.notna(title):
+                    words = re.findall(r'\b\w+\b', str(title).lower())
+                    all_words.extend(words)
+            
+            # Находим наиболее частые слова
+            if all_words:
+                word_counts = Counter(all_words)
+                common_words = [word for word, count in word_counts.most_common(20)]
+                
+                # Создаем бинарные признаки для частых слов
+                for word in common_words:
+                    df_processed[f'contains_{word}'] = df_processed['title'].str.lower().str.contains(word, na=False).astype(int)
         
-        # Собираем все слова из заголовков
-        all_words = []
-        for title in df_processed['title']:
-            words = re.findall(r'\b\w+\b', title.lower())
-            all_words.extend(words)
+        # Создаем признаки на основе длины текста (если есть word_count)
+        if 'word_count' in df_processed.columns:
+            df_processed['is_long_article'] = (df_processed['word_count'] > df_processed['word_count'].median()).astype(int)
+            df_processed['is_short_article'] = (df_processed['word_count'] < df_processed['word_count'].quantile(0.25)).astype(int)
         
-        # Находим наиболее частые слова
-        word_counts = Counter(all_words)
-        common_words = [word for word, count in word_counts.most_common(20)]
+        # Создаем признаки для данных о погоде
+        if 'temperature' in df_processed.columns:
+            df_processed['is_hot'] = (df_processed['temperature'] > df_processed['temperature'].quantile(0.75)).astype(int)
+            df_processed['is_cold'] = (df_processed['temperature'] < df_processed['temperature'].quantile(0.25)).astype(int)
         
-        # Создаем бинарные признаки для частых слов
-        for word in common_words:
-            df_processed[f'contains_{word}'] = df_processed['title'].str.lower().str.contains(word).astype(int)
+        if 'humidity' in df_processed.columns:
+            df_processed['is_humid'] = (df_processed['humidity'] > df_processed['humidity'].quantile(0.75)).astype(int)
         
-        # Создаем признаки на основе длины текста
-        df_processed['is_long_article'] = (df_processed['word_count'] > df_processed['word_count'].median()).astype(int)
-        df_processed['is_short_article'] = (df_processed['word_count'] < df_processed['word_count'].quantile(0.25)).astype(int)
+        if 'wind_speed' in df_processed.columns:
+            df_processed['is_windy'] = (df_processed['wind_speed'] > df_processed['wind_speed'].quantile(0.75)).astype(int)
         
         return df_processed
     
